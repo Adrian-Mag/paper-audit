@@ -4,11 +4,25 @@
 # Ground truth is keyed by verbatim quotes from toy_paper.md, not by claim
 # IDs: claim IDs are assigned per-run by the controller and the analyst's
 # decomposition of the paper into atomic claims is not fully predictable in
-# advance. A scorer should match a produced claim to an entry below by quote
-# containment (the entry's `quote` appears in, or contains, the claim's cited
-# evidence quote; match case-insensitively -- see note on
-# overgeneralized_conclusion), then compare the claim's final verdict to
-# that entry's expected_verdict.
+# advance.
+#
+# Each entry has `quotes` (a list, not a single string) and `match_on`,
+# which says which field of a produced claim those quotes are compared
+# against, case-insensitively, by substring containment:
+#
+#   match_on: evidence_quote (default) -- match against the claim's CITED
+#     PASSAGE. Use this when the entry represents a fact the paper states,
+#     and multiple quotes exist because the paper states that same fact in
+#     more than one place with different wording (e.g. the Abstract and the
+#     Results section both report the same reaction-time result, worded
+#     differently -- a real analyst cites one or the other inconsistently
+#     across runs, and both are equally valid evidence).
+#
+#   match_on: claim_text -- match against the claim's OWN ASSERTED TEXT.
+#     Use this for a proposition we expect the analyst to extract
+#     regardless of what it cites as evidence for it -- see
+#     overgeneralized_conclusion below, where the evidence is expected to
+#     vary (and is inadequate) precisely because the claim overgeneralizes.
 
 fixture: toy
 paper_file: toy_paper.md
@@ -21,35 +35,41 @@ question:
 
 ground_truth:
   - id: sample_and_procedure
-    quote: "Twenty-four undergraduate students"
+    quotes:
+      - "Twenty-four undergraduate students"
     expected_verdict: supported
     is_trap: false
     note: >
-      Directly stated in Method (2.1 Participants). Any claim citing this
-      text as evidence for who participated should be supported.
+      Directly stated in Method (2.1 Participants), and again (verbatim,
+      same words) in the Abstract. Any claim citing either occurrence as
+      evidence for who participated should be supported.
 
   - id: reaction_time_result
-    quote: "response time on the digit-span task was 612 ms"
+    quotes:
+      - "response time on the digit-span task was 612 ms"
+      - "decreased by 18% following the paced-breathing condition relative to the control condition (612 ms vs. 746 ms)"
     expected_verdict: supported
     is_trap: false
     note: >
-      The paper's own narrowly-scoped empirical finding: this task, this
-      sample, this comparison. Anchored to the Results section's raw-data
-      sentence rather than the Abstract's rounded "18%" restatement of the
-      same fact, because a good analyst should (and in practice does) prefer
-      citing the actual data over a summary of it -- see the analyst prompt's
-      "Selecting evidence" section. Supported as long as the claim stays
-      within that scope. This is the finding the trap overgeneralizes -- see
+      The paper states this same finding twice, worded differently: the
+      Results section's raw-data sentence ("was 612 ms (SD = 88 ms)...
+      This 18% reduction was statistically significant") and the Abstract's
+      rounded restatement ("decreased by 18%... (612 ms vs. 746 ms)"). Real
+      analysts cite one or the other inconsistently across runs -- both are
+      equally valid, specific, narrowly-scoped evidence, so both are listed.
+      This is the finding the trap overgeneralizes -- see
       overgeneralized_conclusion below.
 
   - id: accuracy_null_result
-    quote: "Accuracy on the digit-span task did not differ significantly"
+    quotes:
+      - "Accuracy on the digit-span task did not differ significantly"
     expected_verdict: supported
     is_trap: false
     note: Directly stated null result in Results; should be supported.
 
   - id: stated_limitation
-    quote: "our sample was limited to undergraduate students at a single university"
+    quotes:
+      - "our sample was limited to undergraduate students at a single university"
     expected_verdict: supported
     is_trap: false
     note: >
@@ -59,29 +79,39 @@ ground_truth:
       limitation holds.
 
   - id: overgeneralized_conclusion
-    quote: "paced breathing improves cognitive performance"
+    match_on: claim_text
+    quotes:
+      - "improves cognitive performance"
+      - "promising general intervention"
+      - "low-cost tool worth pursuing"
     expected_verdict: not_supported
     is_trap: true
     note: >
       THE PLANTED TRAP. Discussion and Conclusion both upgrade one
       reaction-time result, on one working-memory task, in 24
-      undergraduates, into an unqualified claim about "cognitive
-      performance" in general. The exact phrase appears twice verbatim
-      (once mid-sentence in Discussion, once capitalized at the start of a
-      sentence in Conclusion) -- match case-insensitively, either counts as
-      the same trap.
+      undergraduates, into unqualified claims about general cognitive
+      benefit. Matched on the CLAIM'S OWN TEXT, not its cited evidence,
+      because the evidence a real analyst attaches to this claim varies
+      across runs and that variation is itself informative, not noise:
 
-      The deterministic quote-check (stage 2) will pass either occurrence,
-      since both are verbatim substrings of the paper. Catching this trap is
-      the entailment verifier's job (stage 3): given only this claim and
-      this quote, with no access to the Results section, it must judge that
-      an unqualified assertion does not entail itself into being general
-      evidence -- the quote is a restatement of the conclusion, not
-      independent grounding. The correct evidentiary support for the
-      narrow, true finding is reaction_time_result, not this sentence.
+      - Sometimes the analyst cites the Discussion's own restatement as
+        "evidence" (self-citation -- a passage that only reasserts the
+        claim's conclusion, with no independent grounding).
+      - Sometimes it instead cites the genuine, narrow Results/Abstract
+        data (the same passages as reaction_time_result) -- real evidence,
+        but for a claim broader than that evidence establishes.
 
-      A run in which this claim resolves to `supported` has failed the
-      audit, regardless of what verdict every other claim received.
+      Both are instances of the same trap and both must resolve to
+      something other than `supported`: the deterministic quote-check
+      (stage 2) passes either way, since both quotes are verbatim
+      substrings of the paper. Catching this is entirely the entailment
+      verifier's job (stage 3) -- given only the claim and whichever
+      passage was cited, it must recognize that neither a restatement nor a
+      too-narrow data point establishes the general claim.
+
+      A run in which any claim matching these phrases resolves to
+      `supported` has failed the audit, regardless of what verdict every
+      other claim received.
 
 scoring_notes: >
   A passing run supports every entry above except overgeneralized_conclusion,
@@ -90,4 +120,6 @@ scoring_notes: >
   the analyst that don't match any ground_truth entry are not scored against
   this file but should still be reviewed manually: this list is the minimum
   expected claim set, not a ceiling on what a reasonable analyst might
-  extract.
+  extract. sample_and_procedure and stated_limitation in particular are not
+  always extracted at all, given how the question above is worded -- that is
+  an extraction gap, not a matching failure, and no quote variant can fix it.

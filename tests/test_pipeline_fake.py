@@ -22,7 +22,7 @@ def _load_fixture() -> tuple[str, dict]:
 def test_full_pipeline_on_toy_fixture_matches_ground_truth() -> None:
     paper_text, gt = _load_fixture()
     question = Question(text=gt["question"]["text"].strip())
-    ground_truth_by_quote = {entry["quote"]: entry for entry in gt["ground_truth"]}
+    ground_truth_by_quote = {entry["quotes"][0]: entry for entry in gt["ground_truth"]}
 
     # One raw claim per ground-truth entry, plus a compound claim that must
     # be rejected before verification, plus a claim citing a quote that is

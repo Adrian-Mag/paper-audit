@@ -126,9 +126,12 @@ def run(fixture: str, backend_name: str, project_root: Path) -> int:
         for entry in score.entries:
             status = "PASS" if entry.passed else "FAIL"
             trap = " [TRAP]" if entry.is_trap else ""
+            if entry.matches:
+                actual = ", ".join(f"{m.claim_id}={m.verdict.value}" for m in entry.matches)
+            else:
+                actual = "no matching claim"
             print(
-                f"  [{status}] {entry.ground_truth_id}{trap}: expected={entry.expected.value} "
-                f"actual={entry.actual.value if entry.actual else 'no matching claim'}",
+                f"  [{status}] {entry.ground_truth_id}{trap}: expected={entry.expected.value} actual={actual}",
                 file=sys.stderr,
             )
         print(f"Overall: {'PASS' if score.passed else 'FAIL'}", file=sys.stderr)
