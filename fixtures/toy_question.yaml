@@ -1,0 +1,93 @@
+# Question posed to the analyst stage for the toy fixture, paired with ground
+# truth for self-scoring the run.
+#
+# Ground truth is keyed by verbatim quotes from toy_paper.md, not by claim
+# IDs: claim IDs are assigned per-run by the controller and the analyst's
+# decomposition of the paper into atomic claims is not fully predictable in
+# advance. A scorer should match a produced claim to an entry below by quote
+# containment (the entry's `quote` appears in, or contains, the claim's cited
+# evidence quote; match case-insensitively -- see note on
+# overgeneralized_conclusion), then compare the claim's final verdict to
+# that entry's expected_verdict.
+
+fixture: toy
+paper_file: toy_paper.md
+
+question:
+  text: >
+    What does this paper report about the effect of the paced-breathing
+    intervention on cognitive performance, and what evidence in the paper
+    supports each claim?
+
+ground_truth:
+  - id: sample_and_procedure
+    quote: "Twenty-four undergraduate students"
+    expected_verdict: supported
+    is_trap: false
+    note: >
+      Directly stated in Method (2.1 Participants). Any claim citing this
+      text as evidence for who participated should be supported.
+
+  - id: reaction_time_result
+    quote: "response time on the digit-span task was 612 ms"
+    expected_verdict: supported
+    is_trap: false
+    note: >
+      The paper's own narrowly-scoped empirical finding: this task, this
+      sample, this comparison. Anchored to the Results section's raw-data
+      sentence rather than the Abstract's rounded "18%" restatement of the
+      same fact, because a good analyst should (and in practice does) prefer
+      citing the actual data over a summary of it -- see the analyst prompt's
+      "Selecting evidence" section. Supported as long as the claim stays
+      within that scope. This is the finding the trap overgeneralizes -- see
+      overgeneralized_conclusion below.
+
+  - id: accuracy_null_result
+    quote: "Accuracy on the digit-span task did not differ significantly"
+    expected_verdict: supported
+    is_trap: false
+    note: Directly stated null result in Results; should be supported.
+
+  - id: stated_limitation
+    quote: "our sample was limited to undergraduate students at a single university"
+    expected_verdict: supported
+    is_trap: false
+    note: >
+      The paper's own hedge about generalizability, from Discussion. A claim
+      that the authors state this limitation should be supported -- this is
+      a claim about what the paper says, not an independent claim that the
+      limitation holds.
+
+  - id: overgeneralized_conclusion
+    quote: "paced breathing improves cognitive performance"
+    expected_verdict: not_supported
+    is_trap: true
+    note: >
+      THE PLANTED TRAP. Discussion and Conclusion both upgrade one
+      reaction-time result, on one working-memory task, in 24
+      undergraduates, into an unqualified claim about "cognitive
+      performance" in general. The exact phrase appears twice verbatim
+      (once mid-sentence in Discussion, once capitalized at the start of a
+      sentence in Conclusion) -- match case-insensitively, either counts as
+      the same trap.
+
+      The deterministic quote-check (stage 2) will pass either occurrence,
+      since both are verbatim substrings of the paper. Catching this trap is
+      the entailment verifier's job (stage 3): given only this claim and
+      this quote, with no access to the Results section, it must judge that
+      an unqualified assertion does not entail itself into being general
+      evidence -- the quote is a restatement of the conclusion, not
+      independent grounding. The correct evidentiary support for the
+      narrow, true finding is reaction_time_result, not this sentence.
+
+      A run in which this claim resolves to `supported` has failed the
+      audit, regardless of what verdict every other claim received.
+
+scoring_notes: >
+  A passing run supports every entry above except overgeneralized_conclusion,
+  which must resolve to something other than `supported` (ideally
+  `not_supported`) for conservative synthesis to drop it. Claims produced by
+  the analyst that don't match any ground_truth entry are not scored against
+  this file but should still be reviewed manually: this list is the minimum
+  expected claim set, not a ceiling on what a reasonable analyst might
+  extract.
